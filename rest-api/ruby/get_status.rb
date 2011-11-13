@@ -18,10 +18,8 @@ base_url = 'http://' + user+ ':' + password +'@' + server + ':' + port+rest_base
 response = RestClient.get base_url + 'status.json'
 
 data = JSON.parse(response)
-inner = data['status']
 
 
-
-inner.each do |key,value|
+data.each do |key,value|
  print key +':' +value.to_s + "\n"
 end
