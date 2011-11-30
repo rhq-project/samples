@@ -1,7 +1,7 @@
 #!/bin/sh
 
 function usage {
-  echo "Usage: `badename $0` <user> <password>"
+  echo "Usage: `basename $0` <user> <password>"
 echo
 }
 
