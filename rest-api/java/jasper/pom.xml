@@ -26,10 +26,23 @@
             <artifactId>xalan</artifactId>
             <version>2.7.1-1.jbossorg</version>
         </dependency>
-<!--
-        <dependency>
-            <groupId>org.apache</groupId>
-        </dependency>
--->
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.2</version>
+                <configuration>
+                    <mainClass>org.rhq.examples.dynamicreports.PlatformsReport</mainClass>
+                    <arguments>
+                        <argument>rhqadmin</argument>
+                        <argument>rhqadmin</argument>
+                        <argument>localhost</argument>
+                    </arguments>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>
