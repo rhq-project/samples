@@ -1,0 +1,26 @@
+RULE write out stats
+CLASS org.rhq.enterprise.agent.AgentMain
+METHOD main(String[])
+HELPER org.rhq.augeas.test.CreateAndCloseTracker
+AT EXIT
+IF true
+DO writeStats()
+ENDRULE
+
+RULE increment reference count on Augeas init
+CLASS net.augeas.Augeas
+METHOD <init>(String, String, int)
+HELPER org.rhq.augeas.test.CreateAndCloseTracker
+AT ENTRY
+IF true
+DO recordCreate($0, formatStack())
+ENDRULE
+
+RULE decrement reference count on Augeas close
+CLASS net.augeas.Augeas
+METHOD close()
+HELPER org.rhq.augeas.test.CreateAndCloseTracker
+AT EXIT
+IF true
+DO recordClose($0, formatStack())
+ENDRULE
