@@ -35,5 +35,5 @@ abline(h=quantile(h,.80), col="lightgreen")
 ## compute and plot 20 items moving average requires library 'TTR'
 libFound <- library("TTR", logical.return=TRUE)
 if (libFound) {
-  points(df$timeStamp,SMA(h,n=20),col="red",pch="-")
+  points(df$timeStamp,EMA(h,n=20),col="red",pch="-")
 }
