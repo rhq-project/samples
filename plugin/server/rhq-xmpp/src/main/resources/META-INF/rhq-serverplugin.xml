@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<alert-plugin name="alert-xmpp" version="4.0.1"
+	displayName="Alert:XMPP" xmlns="urn:xmlns:rhq-serverplugin.alert"
+	xmlns:c="urn:xmlns:rhq-configuration" xmlns:serverplugin="urn:xmlns:rhq-serverplugin"
+	package="org.rhq.enterprise.server.plugins.xmpp"
+	description="Alert sender plugin that sends alert notifications via XMPP messages"
+	disabledOnDiscovery="true">
+
+	<serverplugin:help>Used to send notifications by XMPP chat.</serverplugin:help>
+
+	<serverplugin:plugin-component class="XMPPComponent" />
+	
+	<plugin-class>org.rhq.enterprise.server.plugins.xmpp.sender.XMPPSender</plugin-class>
+
+	<short-name>XMPP message</short-name>
+
+
+	<!-- Global preferences for all XMPP alerts -->
+	<serverplugin:plugin-configuration>
+		<c:simple-property name="server" displayName="XMPP Server Host"
+			description="Host for the XMPP Server" type="string" required="true" />
+
+		<c:simple-property name="port" displayName="XMPP Server Port"
+			description="Port for the XMPP Server" type="string" required="true"
+			default="5222">
+			<c:constraint>
+				<c:regex-constraint expression="(\d)*" />
+			</c:constraint>
+		</c:simple-property>
+		
+		<c:simple-property name="serviceName" displayName="Service Name"
+			description="Service name of the server" type="string" required="false" />
+		<c:simple-property name="username" displayName="Username"
+			description="Username to be used on chat" type="string" required="true" />
+		<c:simple-property name="password" displayName="Password"
+			description="User password" type="password" required="true" />
+			
+	</serverplugin:plugin-configuration>
+
+	
+
+	<alert-configuration>
+		<c:simple-property name="messageTo" type="string"
+			required="true" description="Username to send the message" />
+	</alert-configuration>
+
+</alert-plugin>
