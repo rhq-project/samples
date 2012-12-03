@@ -21,6 +21,39 @@ var p = function(object) {
 	}
 };
 
+//Production steps of ECMA-262, Edition 5, 15.4.4.19
+//Reference: http://es5.github.com/#x15.4.4.19
+if (!Array.prototype.map) {
+	Array.prototype.map = function(callback, thisArg) {
+		var T, A, k;
+		if (this == null) {
+			throw new TypeError(" this is null or not defined");
+		}
+		var O = Object(this);
+		var len = O.length >>> 0;
+		if (typeof callback !== "function") {
+			throw new TypeError(callback + " is not a function");
+		}
+		if (thisArg) {
+			T = thisArg;
+		}
+		A = new Array(len);
+		k = 0;
+		while (k < len) {
+			var kValue, mappedValue;
+			if (k in O) {
+				kValue = O[k];
+				mappedValue = callback.call(T, kValue, k, O);
+				A[k] = mappedValue;
+			}
+			k++;
+		}
+		return A;
+	};
+}
+
+
+
 /**
  * @ignore this common module is instantiated by most of modules as private var
  */
@@ -653,18 +686,33 @@ var bundles = (function() {
 		/**
 		 * creates a bundle
 		 *
-		 * @param {String} dist - path to bundle distribution ZIP file
+		 * @param {String} dist - path to bundle distribution ZIP file or URL. 
+		 * If URL it must be reachable by RHQ server
 		 * @type Bundle
 		 */
     createFromDistFile : function(dist) {
+    	if (dist==null) {
+    		throw "parameter dist must not be null"
+    	}
+    	if (dist.indexOf("http")==0) {
+    		var version = BundleManager.createBundleVersionViaURL(dist);
+		    return new Bundle(version.bundle);
+    	}
+    	else {
 			var file = new java.io.File(dist);
 			if (!file.exists()) {
 				throw "file parameter ["+file+"] does not exist!";
 			}
-		    var version = BundleManager.createBundleVersionViaFile(file);
-		    println(version.bundle.id);
+		    var inputStream = new java.io.FileInputStream(file);
+		    var fileLength = file.length();
+		    var fileBytes = java.lang.reflect.Array.newInstance(java.lang.Byte.TYPE, fileLength);
+		    for (numRead=0, offset=0; ((numRead >= 0) && (offset < fileBytes.length)); offset += numRead ) {
+			    numRead = inputStream.read(fileBytes, offset, fileBytes.length - offset);
+		    }
+		    var version = BundleManager.createBundleVersionViaByteArray(fileBytes);
 		    return new Bundle(version.bundle);
-		},
+    	}
+	},
 
 		// createFromRecipe : function(recipe,files) {
 			// we're creating a resource with backing content
@@ -1268,6 +1316,7 @@ var Resource = function (param) {
 	if (!param) {
 		throw "either Number or org.rhq.bindings.client.ResourceClientProxy parameter is required";
 	}
+	common.debug("Retrieving proxy instance")
 	if ("number" == typeof param) {
 		param = ProxyFactory.getResource(param);
 	}
@@ -1276,9 +1325,88 @@ var Resource = function (param) {
 	}
 
 	var _id = param.id;
+	var _name = param.name;
 	var _res = param;
+	
+	// we define a metric as an internal type
+	//TODO implement reading last metric value properly
+	/**
+	 * creates a new instance of Metric
+	 * @class
+	 * @constructor
+	 * @name Metric
+	 */
+	var Metric = function(param,res) {
+		var common = new _common();
+		var _param = param;
+		var _res = res;
+		var _defId = function() {
+			var criteria = common.createCriteria(new MeasurementDefinitionCriteria(),{resourceTypeId:_res.resourceType.id,displayName:_param.name});				
+			var mDefs = MeasurementDefinitionManager.findMeasurementDefinitionsByCriteria(criteria);
+			println(mDefs);
+			if (mDefs.size()!=1) {
+				throw "Unable to retrieve measurement definition, this is a bug"
+			}
+			return mDefs.get(0).id;
+		};
+		return {
+			/**
+			 * name of metric
+			 * @lends Metric.prototype
+			 * @field
+			 * @type String
+			 */
+			name : param.name,
+			/**
+			 * gets live value for metric
+			 * @type String
+			 * @returns String whatever the value is
+			 * 
+			 */
+			getLiveValue : function() {
+				common.trace("Resource("+_res.id+").metrics.["+param.name+"].getLiveValue()");				
+				var defId = _defId();
+				var values = MeasurementDataManager.findLiveData(_res.id,[defId])
+				var value = values.get(0);
+				return String(value.value);
+			},
+			/**
+			 * enables/disables metric and sets its collection interval
+			 * @param enabled {Boolean} - enable or disable metric
+			 * @param interval {Number} - optinally set collection interval
+			 */
+			set : function(enabled,interval) {
+				common.trace("Resource("+_res.id+").metrics.["+param.name+"].set(enabled="+enabled+",interval="+interval+")");
+				var defId = _defId();
+				if (enabled==false) {
+					common.debug("Disabling measurement");
+					MeasurementScheduleManager.disableSchedulesForResource(_res.id,[defId])
+					return;
+				}else if (enabled==true) {
+					common.debug("Enabling measurement");
+					MeasurementScheduleManager.enableSchedulesForResource(_res.id,[defId])
+				}
+				if (typeof interval == "number") {
+					common.debug("Setting collection interval to "+interval+"s");
+					MeasurementScheduleManager.updateSchedulesForResource(_res.id,[defId],interval*1000);
+				}
+				
+			}
+		}
+	};
+	
   var _dynamic = {};
-
+  
+  var _shortenMetricName = function(name) {
+	  return (String(name)[0].toLowerCase()+name.substring(1)).replace(/ /g,"");
+  }
+  common.debug("Enumerating metrics")
+  var _metrics = {};
+  for (index in param.measurements) {
+	  var metric = new Metric(param.measurements[index],param);
+	  var _metricName = _shortenMetricName(metric.name);
+	  _metrics[_metricName] = metric;
+  }
   var _retrieveContent = function(destination) {
 		var self = ProxyFactory.getResource(_id);
 		var func = function() {
@@ -1329,6 +1457,7 @@ var Resource = function (param) {
 			common.waitFor(func);
 		};
 	}
+
 
 	var _getName = function(){
 		return _res.getName();
@@ -1417,10 +1546,39 @@ var Resource = function (param) {
 	  * @lends Resource.prototype
 	  */
     id : _id,
-  	/**
+    /**
+     * gets resource name
+     * @type String
+     */
+    name : _name,
+	/**
+	 * enumerates metrics available for this resource, returned value is not an array but a hash,
+	 * where name is metric name without spaces
+	 * @example resource.metrics.totalSwapSpace // get's a metric called 'Total Swap Space'
+	 * @type Metric[]
+	 * @field
+	 */
+    metrics : _metrics,
+    /**
+     * gets a metric by it's name
+     * @example resource.getMetric("Total Swap Space")
+     * @type Metric
+     */
+    getMetric : function(name) {
+    	common.trace("Resource("+_id+").getMetric("+name+")");
+    	var key = _shortenMetricName(name);
+    	if (key in _metrics) {
+    		return _metrics[key];
+    	}
+    	else {
+    		throw "Cannot find metric called ["+name+"]"
+    	}
+    },
+    /**
     * gets resource ID
 	  * @type Number
 	  */
+    
     getId : function() {return _id;},
     /**
     * gets resource String representation
@@ -1428,12 +1586,12 @@ var Resource = function (param) {
     */
 		toString : function() {return _res.toString();},
     /**
-	  *
+	  * gets resource name
 	  * @type String
 	  */
     getName : function() {return _getName();},
 	  /**
-	  * returns Resource proxy object
+	  * @returns Resource proxy object
 	  */
     getProxy : function() {
 			common.trace("Resource("+_id+").getProxy()");
@@ -1891,6 +2049,134 @@ var Resource = function (param) {
 };
 
 
+//
+/**
+* Function - Gets configuration parameter boolean value for given configuration object
+* 
+* @param - configuration // config object
+* @param - configProperty //configuration property	 
+*	
+*            
+* @return - isEnabled // boolean
+*/
+var isConfigPropertyEnabled = function(configuration, configProperty){
+	var isEnabled = configuration.getSimple(configProperty).getBooleanValue();
+
+	return isEnabled;
+}
+
+
+/**
+* Function - Wait For Configuration To Update
+* 
+* @param	update  //  configuation update result	
+* @param	resourceId
+*	
+*            
+* @return - updateStatus //boolean
+*/
+
+var waitForConfigurationToUpdate = function(update, resourceId){
+	var common = new _common();
+	if (!update) {
+		common.debug("Configuration has not been changed");
+		return;
+	}
+	if (update.status == ConfigurationUpdateStatus.INPROGRESS) {
+		var pred = function() {
+			var up = ConfigurationManager.getLatestResourceConfigurationUpdate(resourceId);
+			if (up) {
+				return up.status != ConfigurationUpdateStatus.INPROGRESS;
+			}
+		};
+		common.debug("Waiting for configuration to be updated...");
+		var result = common.waitFor(pred);
+		if (!result) {
+			throw "Resource configuration update timed out!";
+		}
+		update = ConfigurationManager.getLatestResourceConfigurationUpdate(resourceId);
+	}
+	common.debug("Configuration update finished with status : "+update.status);
+	if (update.status == ConfigurationUpdateStatus.FAILURE) {
+		common.info("Resource configuration update failed : "+update.errorMessage);
+	}
+	return update.status == ConfigurationUpdateStatus.SUCCESS;
+}
+
+/**
+* Function - Update  Configuration, check update is done, change config back
+* 
+* @param	resourceId  //  resource Id
+* @param	oldConfiguration 
+* @param 	configPropValue // String config property value
+*	isEnabled // boolean
+*            
+* @return - 
+*/
+var updateConfigurationString = function(resourceId, configuration, configProperty, configPropValue ){
+	var common = new _common();
+	println(configuration);
+	var configValue = configuration.getSimple(configProperty).stringValue;
+
+
+	//update config
+	configuration.setSimpleValue(configProperty, configPropValue ); 
+	var update = ConfigurationManager.updateResourceConfiguration(resourceId, configuration);
+	if(!(waitForConfigurationToUpdate(update,resourceId))){
+		return ;
+	}
+
+	var newConfiguration = ConfigurationManager.getResourceConfiguration(resourceId);
+	var configValueNew1 = newConfiguration.getSimple(configProperty).stringValue;
+	assertTrue(configValueNew1 == configPropValue, "Updating  "+ configProperty +" configuration failed!!");
+
+
+	// update configuration back
+	newConfiguration.setSimpleValue(configProperty, configValue); 
+	var update = ConfigurationManager.updateResourceConfiguration(resourceId, newConfiguration);
+	
+	if(!(waitForConfigurationToUpdate(update,resourceId))){
+		return ;
+	}
+	var newConfiguration2 = ConfigurationManager.getResourceConfiguration(resourceId);
+	var configValueNew2 = newConfiguration2.getSimple(configProperty).stringValue;
+
+
+	assertTrue(!configValueNew1.equals(configValueNew2) , "Updating  "+ configProperty +" configuration failed!!");
+	assertTrue(configValueNew2 == configValue , "Updating  "+ configProperty +" configuration failed!!");
+	
+}
+
+
+/**
+* Function - Update n Configuration
+* 
+* @param - resourceId  // n resource Id
+* @param	oldConfiguration 
+* @param	isEnabled // boolean
+*            
+* @return - newConfiguration
+*/
+
+var updateConfigurationBoolean = function(resourceId,configuration,configProperty,isEnabled ){
+
+if (isEnabled == true){
+	configuration.setSimpleValue(configProperty,  "false"); 
+}
+else {
+	configuration.setSimpleValue(configProperty,  "true"); 
+	}
+
+var update = ConfigurationManager.updateResourceConfiguration(resourceId, configuration);
+var configUpdateStatus = waitForConfigurationToUpdate(update,resourceId);
+if(!configUpdateStatus){
+	return ;
+}
+var newConfiguration = ConfigurationManager.getResourceConfiguration(resourceId);
+
+return newConfiguration;
+
+}
 
 /**
  * @lends _global_
