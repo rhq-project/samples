@@ -1402,11 +1402,11 @@ var Resource = function (param) {
   }
   common.debug("Enumerating metrics")
   var _metrics = {};
-  for (index in param.measurements) {
-	  var metric = new Metric(param.measurements[index],param);
-	  var _metricName = _shortenMetricName(metric.name);
-	  _metrics[_metricName] = metric;
-  }
+//  for (index in param.measurements) {
+//	  var metric = new Metric(param.measurements[index],param);
+//	  var _metricName = _shortenMetricName(metric.name);
+//	  _metrics[_metricName] = metric;
+//  }
   var _retrieveContent = function(destination) {
 		var self = ProxyFactory.getResource(_id);
 		var func = function() {
