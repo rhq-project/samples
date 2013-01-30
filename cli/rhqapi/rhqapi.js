@@ -1,24 +1,20 @@
 /**
  * @overview this library tries to be synchronous and high-level API built on top of standard RHQ remote API
  * @name RHQ API
- * @version 0.1
+ * @version 0.2
  * @author Libor Zoubek (lzoubek@redhat.com), Filip Brychta (fbrychta@redhat.com)
  */
 
 
 // jsdoc-toolkit takes care of generating documentation
-// please follow http://code.google.com/p/jsdoc-toolkit/wiki/TagReference for adding correct tags
+// please follow http://code.google.com/p/jsdoc-toolkit/wiki/TagReference for adding correct tag
 
 /**
- * print function that recognizes arrays and prints each item on new line
+ * print function that recognizes arrays or JS objects (hashes) and prints each item on new line,
+ * it produces JSON-like output (but NOT JSON)
  */
 var p = function(object) {
-	if (object instanceof Array) {
-		object.forEach(function(x){println(x);});
-	}
-	else {
-		println(object);
-	}
+	println(new _common().objToString(object))
 };
 
 //Production steps of ECMA-262, Edition 5, 15.4.4.19
@@ -71,20 +67,32 @@ var _common = function() {
     var zeros = function(number) {if (number<10) { number = "0"+number;} return number;};
 		return zeros(now.getHours())+ ":"+zeros(now.getMinutes())+":"+zeros(now.getSeconds());
 	};
-	var _debug = function(message) {
-		if (typeof verbose == "number" && verbose>=1) {
-			_println(_time()+" [DEBUG] "+message);
-		}
-	};
+
 	var _trace = function(message) {
 		if (typeof verbose == "number" && verbose>=2) {
 			_println(_time()+" [TRACE] "+message);
+		}
+	};
+	
+	var _debug = function(message) {
+		if (typeof verbose == "number" && verbose>=1) {
+			_println(_time()+" [DEBUG] "+message);
 		}
 	};
 
 	var _info = function(message) {
 		if (typeof verbose == "number" && verbose>=0) {
 			_println(_time()+" [INFO] "+message);
+		}
+	};
+	var _warn = function(message) {
+		if (typeof verbose == "number" && verbose>=-1) {
+			_println(_time()+" [WARN] "+message);
+		}
+	};
+	var _error = function(message) {
+		if (typeof verbose == "number" && verbose>=-2) {
+			_println(_time()+" [ERROR] "+message);
 		}
 	};
 	// taken from CLI samples/utils.js
@@ -360,7 +368,7 @@ var _common = function() {
 					}
 
 					if (propDef==null) {
-						common.debug("Unable to get PropertyDefinition for key="+key);
+						_debug("Unable to get PropertyDefinition for key="+key);
 						return;
 					}
 					// process all 3 possible types
@@ -403,12 +411,110 @@ var _common = function() {
 		return original;
 	};
 
-
 	return {
-		objToString : function(obj) {
-			var str="";
-			for (var k in obj) {if (obj.hasOwnProperty(k)) str=str.concat(k+"="+obj[k]+",");}
-			return str.substring(0,str.length-1);
+		objToString : function(hash) {
+			function isArray(obj) {
+				return typeof (obj) == 'object' && (obj instanceof Array);
+			}
+			function isHash(obj) {
+				return typeof (obj) == 'object' && !(obj instanceof Array);
+			}
+
+			function isPrimitive(obj) {
+				return typeof (obj) != 'object' || obj == null || (obj instanceof Boolean || obj instanceof Number || obj instanceof String);
+			}
+			function isJavaObject(obj) {
+				return typeof (obj) == 'object' && typeof (obj.getClass) != 'undefined'
+			}
+			if (!hash) {
+				return hash;
+			}
+			// process only hashes, everything else is "just" string
+			if (!isHash(hash)) {
+				return String(hash);
+			}
+			output = "";
+			for (key in hash) {
+				if (!hash.hasOwnProperty(key)) {
+					continue;
+				}
+				var valueStr = (function(key, value) {
+
+					var me = arguments.callee;
+
+					var prop = null;
+					if (typeof value == "function") {
+						return;
+					}
+					// if non-empty key was passed we are going to print this
+					// element as key:<something>
+					// otherwise there's no key to print
+					var kkey = "";
+					if (key != "") {
+						kkey = key + ":";
+					}
+					if (isPrimitive(value)) {
+						// primitive types
+						if (value instanceof Number || value instanceof Boolean) {
+							prop = kkey + value;
+						} else {
+							prop = kkey + "\'" + value + "\'";
+						}
+
+					} else if (isJavaObject(value)) {
+						// java object - should't be here
+						prop = kkey + String(value);
+					} else if (isArray(value)) {
+						// by printing array we deeper (passing empty key)
+						prop = kkey + "[";
+						for ( var i = 0; i < value.length; ++i) {
+							var v = value[i];
+							if (v != null) {
+								var repr = me("", v)
+								if (repr) {
+									// only if value was printed to something
+									prop += repr + ",";
+								}
+							}
+						}
+						// trim last ','
+						prop = prop.substring(0, prop.length - 1) + "]"
+					} else if (isHash(value)) {
+						// printing hash, again we go deeper
+						prop = kkey + "{";
+						for ( var i in value) {
+							var v = value[i];
+							var repr = me(i, v)
+							if (repr) {
+								prop += repr + ",";
+							}
+						}
+						prop = prop.substring(0, prop.length - 1) + "}"
+					} else {
+						// this code should not be reached
+						println("it is unkonwn");
+						println(typeof value);
+						println(value);
+						return;
+					}
+					return prop;
+				})(key, hash[key])
+
+				if (valueStr) {
+					output += valueStr + ",";
+				}
+			}
+			output = output.substring(0, output.length - 1);
+			return "{"+output+"}";
+		},
+		arrayToSet : function(array){
+			var hashSet = new java.util.HashSet();
+			if(array){
+				for(i in array){
+					hashSet.add(array[i]);
+				}
+			}
+			return hashSet;
 		},
 		pageListToArray : function(pageList) {
 			var resourcesArray = new Array();
@@ -451,6 +557,8 @@ var _common = function() {
 			}
 			return result;
 		},
+		error : _error,
+		warn : _warn,
 		info : _info,
 		debug : _debug,
 		trace : _trace,
@@ -511,11 +619,508 @@ var _common = function() {
 			    }
 			}
 			return criteria;
-		},
+		}
 	};
 };
 
 
+/**
+ * @namespace provides access to all available permissions
+ */
+var permissions = (function(){
+	// get an array of native permissions
+	var _globalPNat = Permission.GLOBAL_ALL.toArray();
+	var _resourcePNat = Permission.RESOURCE_ALL.toArray() ;
+	
+	var _allGlobalP = new Array();
+	var _allResourceP = new Array();
+	
+	// fill array with javascript strings 
+	for(i in _globalPNat){
+		// make sure we have javascript string
+		_allGlobalP[i] = String(_globalPNat[i].toString());
+	}
+	for(i in _resourcePNat){
+		// make sure we have javascript string
+		_allResourceP[i] = String(_resourcePNat[i].toString());
+	}
+	
+	
+	var _allP = _allGlobalP.concat(_allResourceP); 
+
+	return{
+		/** 
+		 * All available permission names
+		 * @public
+		 * @type String[]
+		 * @returns Array of all permission names
+		 */
+		all : _allP,
+		/** 
+		 * All available global (global permissions do not apply to specific resources in groups) permission names
+		 * @public
+		 * @type String[]
+		 */
+		allGlobal : _allGlobalP,
+		/** 
+		 * All available resource (resource permissions apply only to the resources in the role's groups) permission names
+		 * @public
+		 * @type String[]
+		 */
+		allResource : _allResourceP,
+		/** 
+		 * Prints names and types of all permissions 
+		 * @public
+		 */
+		printAllPermissions : function(){
+			var perms = Permission.values();
+			for(i in perms){
+				println("Permission name: " + perms[i] + ", target: " + perms[i].getTarget());
+			}
+		}
+	}
+}) ();
+
+
+//roles
+
+/**
+ * @namespace provides access to roles
+ */
+var roles = (function() {
+	var common = new _common();
+	
+	// all valid accepted parameters
+	var _validParams = ["description","name","permissions"];
+	/** 
+	 * Checks if given parameter is part of valid parameters, throw an error message otherwise 
+	 * @private
+	 * @param {string} param parameter to check
+	 * @throws parameter is not valid
+	 */
+	var _checkParam = function(param){
+		if(_validParams.indexOf(param) == -1){
+        	throw "Parameter ["+param+"] is not valid, valid are : "+_validParams.valueOf();
+		}
+	};
+	/** 
+	 * Sets up given native Role according to given parameters 
+	 * @private
+	 * @param {org.rhq.core.domain.authz.Role} natRole native role to set up
+	 * @param {Object} params
+	 * @returns {org.rhq.core.domain.authz.Role} prepared native role
+	 * @throws some of given parameters are not valid
+	 */
+	var _setUpNatRole = function(natRole,params){
+		for (var k in params) {
+		    // use hasOwnProperty to filter out keys from the
+			// Object.prototype
+		    if (params.hasOwnProperty(k)) {
+		    	_checkParam(k);
+		        var key = k[0].toUpperCase()+k.substring(1);
+	        	var func = eval("natRole.set"+key);
+	        	if(typeof func == "undefined"){
+		        	throw "Given parameter '"+key+"' is not defined on org.rhq.core.domain.authz.Role object";
+		        }
+	        	func.call(natRole,params[k]);
+		    }
+		}
+		
+		return natRole;
+	};
+	
+	var _findRoles = function(params){
+		common.debug("Searching for roles '"+common.objToString(params) +"'");
+		var criteria = common.createCriteria(new RoleCriteria(),params);
+		criteria.clearPaging();
+		var roles = RoleManager.findRolesByCriteria(criteria);
+
+		return common.pageListToArray(roles).map(function(x){return new Role(x);});		
+	}
+	
+	var _getRole = function(roleName){
+		common.debug("Searching for role with name '"+roleName +"'");
+		var roles = _findRoles({name:roleName});
+
+		for(i in roles){
+			if(roles[i].name == roleName){
+				common.debug("Role " + roleName+ " found.");
+				return roles[i];
+			}
+		}
+		
+		common.debug("Role " + roleName+ " not found.");
+		return null;
+	}
+	
+	return {
+		/** 
+		 * Creates a new role acorrding to given parameters.
+		 * @public
+		 * @param {Object} params - see roles.validParams for available params.
+		 * @example roles.createRole({name: "boss",description:"Role with all permissions.",permissions:permissions.all });
+		 * @returns {Role} a newly created role
+		 */
+		createRole : function(params){
+			params = params || {};
+			common.info("Creating a new role with following parameters: '"+common.objToString(params) +"'");
+			
+			// check permission names and prepare hash set with native permissions
+			if(params.permissions){
+				var permSet = new java.util.HashSet();
+				for(i in params.permissions){
+					try
+					{
+						permSet.add(Permission.valueOf(params.permissions[i]));
+					} catch (exc) {
+						throw "'" + params.permissions[i]+"', permission name is not correct!";
+					}
+				}
+				params.permissions = permSet;
+			}
+			
+			var rawRole = _setUpNatRole(new org.rhq.core.domain.authz.Role,params);
+			var role = RoleManager.createRole(rawRole);
+
+			return new Role(role);
+		},
+		/** 
+		 * Deletes given roles.
+		 * @public
+		 * @param {Array} roleNames - array with names of roles to delete
+		 * @example roles.deleteRoles(["boss","guest"]);
+		 */
+		deleteRoles : function(roleNames){
+			if(typeof roleNames == 'string'){
+				roleNames = [roleNames]
+			}
+			common.info("Removing roles with following names: '"+common.objToString(roleNames) +"'");
+			var role;
+			for(i in roleNames){
+				role = _getRole(roleNames[i]);
+				if(role){
+					RoleManager.deleteRoles([role.id]);
+				}
+			}
+		},
+		/** 
+		 * Gets a given role. Returns found role or null.
+		 * @public
+		 * @function
+		 * @param {string} roleName - name of the role
+		 * @returns {Role} a found role or null
+		 */
+		getRole : _getRole,
+		/** 
+		 * Finds all roles according to given parameters.
+		 * @public
+		 * @function
+		 * @param {Object} params -  see RoleCriteria.addFilter[param] methods for available params
+		 * @returns  Array of found roles.
+		 * @type Role[]
+		 */
+		findRoles : _findRoles,
+		/**
+		 * Prints all valid accepted parameters
+		 * @public
+		 */
+		printValidParams : function(){
+			println("Parameter names: " + _validParams.valueOf());
+		}
+	}
+	
+}) ();
+
+/**
+ * Creates a new instance of Role
+ * @class
+ * @constructor
+ * @param nativeRole {org.rhq.core.domain.authz.Role} native role
+ */
+var Role = function(nativeRole){
+	var common = new _common();
+	nativeRole = nativeRole || {};
+	common.debug("Creating an abstract role: " + nativeRole);
+	
+	var _nativeRole = nativeRole;
+	var _name = _nativeRole.getName();
+	var _id = _nativeRole.getId();
+	
+	/**
+	 * @lends Role.prototype
+	 */
+	return{
+		/**
+		 * Name of this role
+		 * @public
+		 * @field
+		 */
+		name : _name,
+		/**
+		 * Id of this role
+		 * @public
+		 * @field
+		 */
+		id : _id,
+		/**
+		 * Native role which this object abstracts.
+		 * @public
+		 * @field
+		 * @type org.rhq.core.domain.authz.Role
+		 */
+		nativeObj : _nativeRole,
+		/**
+		 * Returns array of all permissions this Role has.
+		 * @public
+		 * @returns {Array}
+		 */
+		getPermissions : function(){
+			var permissSet = _nativeRole.getPermissions();
+			
+			return permissSet.toArray();
+		}
+	}
+};
+
+// users
+
+/**
+ * @namespace provides access to users
+ */
+var users = (function() {
+	var common = new _common();
+	
+	// all valid accepted parameters
+	var _validParams = ["department","emailAddress","factive","firstName","lastName","name","phoneNumber","roles"];
+	/** 
+	 * Checks if given parameter is part of valid parameters, throw an error message otherwise 
+	 * @private
+	 * @param {string} param parameter to check
+	 * @throws parameter is not valid
+	 */
+	var _checkParam = function(param){
+		if(_validParams.indexOf(param) == -1){
+        	throw "Parameter ["+param+"] is not valid, valid are : "+_validParams.valueOf();
+		}
+	};
+	/** 
+	 * Sets up given native Subject according to given parameters 
+	 * @private
+	 * @param {org.rhq.core.domain.auth.Subject} subject native subject to set up
+	 * @param {Object} params
+	 * @returns {org.rhq.core.domain.auth.Subject} prepared native subject
+	 * @throws some of given parameters are not valid
+	 */
+	var _setUpSubject = function(subject,params){
+		for (var k in params) {
+		    // use hasOwnProperty to filter out keys from the
+			// Object.prototype
+		    if (params.hasOwnProperty(k)) {
+		    	_checkParam(k);
+		        var key = k[0].toUpperCase()+k.substring(1);
+		        var func = eval("subject.set"+key);
+		        if(typeof func == "undefined"){
+		        	throw "Given parameter '"+key+"' is not defined on Subject object";
+		        }
+		        func.call(subject,params[k]);
+		    }
+		}
+		
+		return subject;
+	}
+	var _findUsers = function(params){
+		common.debug("Searching for users with following params: '"+common.objToString(params) +"'");
+		var criteria = common.createCriteria(new SubjectCriteria(),params);
+		criteria.clearPaging();
+		var users = SubjectManager.findSubjectsByCriteria(criteria);
+		
+		return common.pageListToArray(users).map(function(x){return new User(x);});
+	}
+	
+	var _getUser = function(userName){
+		common.debug("Searching for user with name: '"+userName +"'");
+		var users = _findUsers({name:userName});
+
+		for(i in users){
+			if(users[i].name == userName){
+				common.debug("User " + userName+ " found.");
+				return users[i];
+			}
+		}
+		
+		common.debug("User " + userName+ " not found.");
+		return null;
+	}
+	
+	return {
+		/** 
+		 * Creates a new user acorrding to given parameters.
+		 * @public
+		 * @param {Object} params - see users.validParams for available params.
+		 * @param {string} password 
+		 * @example users.addUser({firstName:"John",lastName:"Rambo",name:"jrambo",password:"passw",roles:["boss","admin"]);
+		 * @returns {User} a newly created user
+		 */
+		addUser : function(params,password){
+			params = params || {};
+			common.info("Adding following user: '"+common.objToString(params) +"'");
+			if(!password){
+				throw ("Password is expected for a new user.");
+			}
+			
+			var roleNames = params.roles;
+			// fill it with native type, given roles will be added later using RoleManager
+			params.roles = new java.util.HashSet();
+		
+			var rawSubject = _setUpSubject(new Subject,params);
+			var subject = SubjectManager.createSubject(rawSubject);
+			SubjectManager.createPrincipal(subject.getName(),password);
+			
+			var user = new User(subject);
+			if(roleNames){
+				user.assignRoles(roleNames);
+			}
+
+			return user;
+		},
+		/** 
+		 * Deletes given user.
+		 * @public
+		 * @param {String[]} userNames - array with names of users to delete
+		 * @example users.deleteUsers(["jrambo"]);
+		 */
+		deleteUsers : function(userNames){
+			if(typeof userNames == 'string'){
+				userNames = [userNames]
+			}
+			common.info("Removing users with following names: '"+common.objToString(userNames) +"'");
+			
+			var user;
+			for(i in userNames){
+				user = _getUser(userNames[i]);
+				if(user){
+					SubjectManager.deleteSubjects([user.id]);
+				}
+			}
+		},
+		/** 
+		 * Finds all users according to given parameters.
+		 * @public
+		 * @function
+		 * @param {Object} params -  see SubjectCriteria.addFilter[param] methods for available params
+		 * @returns  Array of found users.
+		 * @type Users[]
+		 */
+		findUsers : _findUsers,
+		/** 
+		 * Gets a given user. Returns found user or null.
+		 * @public
+		 * @function
+		 * @param {string} userName - name of the user
+		 * @returns {User} a found user or null
+		 */
+		getUser : _getUser,
+		/**
+		 * Gets all available users.
+		 * @public
+		 * @function
+		 * @returns  Array of found users.
+		 * @type User[]
+		 */
+		getAllUsers : function(){
+			common.debug("Gettign all users");
+
+			return _findUsers({});
+		},
+		/**
+		 * Prints all valid accepted parameters
+		 * @public
+		 */
+		printValidParams : function(){
+			println("Parameter names: " + _validParams.valueOf());
+		}
+		
+	}
+	
+}) ();
+
+/**
+ * Creates a new instance of User
+ * @class
+ * @constructor
+ * @param nativeRole {org.rhq.core.domain.authz.Subject} native subject
+ */
+var User = function(nativeSubject){
+	var common = new _common();
+	nativeSubject = nativeSubject || {};
+	common.debug("Creating following abstract user: " + nativeSubject );
+	
+	var _id = nativeSubject.getId();
+	var _name = nativeSubject.getName();
+	
+	/**
+	 * @lends User.prototype
+	 */
+	return{
+		/**
+		 * Id of this user
+		 * @public
+		 * @field
+		 */
+		id : _id,
+		/**
+		 * Name of this user
+		 * @public
+		 * @field
+		 */
+		name : _name,
+		/**
+		 * Native subject which this object abstracts.
+		 * @public
+		 * @field
+		 * @type org.rhq.core.domain.authz.Subject
+		 */
+		nativeObj : nativeSubject,
+		/**
+		 * Gets all roles assigned to this user.
+		 * @public
+		 * @returns  Array of found roles.
+		 * @type Role[]
+		 */
+		getAllAssignedRoles : function(){
+			common.debug("Searching for assigned roles to user '"+_name+"'");
+			var natRoles = RoleManager.findSubjectAssignedRoles(_id,PageControl.getUnlimitedInstance());
+			
+			return common.pageListToArray(natRoles).map(function(x){return new Role(x);});
+		},
+		/**
+		 * Assigns given roles to this user.
+		 * @public 
+		 * @param {String[]} roleNames array of names of roles which will be assigned to this user
+		 */
+		assignRoles : function(roleNames){
+			common.info("Assigning following roles '"+ common.objToString(roleNames) +"', to user '"+_name+"'");
+
+			if(typeof roleNames == 'string'){
+				roleNames = [roleNames];
+			}
+			var rolesIds = new Array();
+			var j = 0;
+			var role;
+			for(i in roleNames){
+				role = roles.getRole(roleNames[i]);
+				if(role){
+					common.debug("Adding found role " + role);
+					rolesIds[j] = role.id;
+					j++;
+				}else{
+					common.info("Role " + roleNames[i]+ " not found!!");
+				}
+			}
+			RoleManager.addRolesToSubject(_id,rolesIds);
+		}
+	}
+};
 // resource groups
 
 /**
@@ -526,7 +1131,7 @@ var groups = (function() {
 
 	return {
 		/**
-		 * creates a org.rhq.domain.criteria.ResourceCriteria object based on
+		 * creates a org.rhq.domain.criteria.ResourceGroupCriteria object based on
 		 * given params
 		 *
 		 * @param {Obejct}
@@ -536,7 +1141,7 @@ var groups = (function() {
 		 */
 		createCriteria : function(params) {
 			params = params || {};
-			common.trace("groups.createCriteria("+common.objToString(params) +")");
+			common.debug("groups.createCriteria("+common.objToString(params) +")");
 			var criteria = common.createCriteria(new ResourceGroupCriteria(),params, function (key,value) {
 				if (key=="category") { return "addFilterExplicitResourceCategory(ResourceCategory."+value.toUpperCase();}
 			});
@@ -555,7 +1160,7 @@ var groups = (function() {
 		 */
 		find : function(params) {
 			params = params || {};
-			common.trace("groups.find("+common.objToString(params)+")");
+			common.debug("groups.find("+common.objToString(params)+")");
 			var criteria = groups.createCriteria(params);
 			var result = ResourceGroupManager.findResourceGroupsByCriteria(criteria);
 			common.debug("Found "+result.size()+" groups ");
@@ -571,6 +1176,7 @@ var groups = (function() {
 	 */
 		create : function(name,children) {
 			children = children || [];
+			common.info("Creating a group '" + name + "', with following children: '" + common.objToString(children) + "'");
 			var rg = new ResourceGroup(name);
 			// detect whether all resources are same type
 			var resType = null;
@@ -599,19 +1205,20 @@ var groups = (function() {
  */
 var ResGroup = function(param) {
 	var common = new _common();
-	common.trace("new ResGroup("+param+")");
+	common.debug("new ResGroup("+param+")");
 	if (!param) {
 		throw "either number or org.rhq.core.domain.resource.ResourceGroup parameter is required";
 	}
 	var _id = param.id;
 	var _obj = param;
+	var _name = param.name;
     /**
 	 * @lends ResGroup.prototype
 	 */
 	return {
 		/**
 		 * gets ID of this group
-		 * @fiels
+		 * @field
 		 */
 		id : _id,
 		/**
@@ -629,18 +1236,20 @@ var ResGroup = function(param) {
 		/**
 		 * removes this resource group
 		 */
-    remove : function() {
-			common.trace("ResGroup("+_id+").remove()");
+		remove : function() {
+			common.info("Removing a group with name '" + _name + "'");
 			ResourceGroupManager.deleteResourceGroup(_id);
 		},
 		/**
-		 * get resources contained in this group (NOT YET IMPLEMENTED)
+		 * get resources contained in this group
 		 * @param params - you can filter child resources same way as in {@link resources.find()} function
 		 * @returns array of resources
 		 * @type Resrouce[]
 		 */
 		resources : function(params) {
-			// TODO implement
+			params = params || {};
+			params.explicitGroupIds = [_id];
+			return resources.find(params);
 		},
 	}
 };
@@ -1343,11 +1952,17 @@ var Resource = function (param) {
 		var _defId = function() {
 			var criteria = common.createCriteria(new MeasurementDefinitionCriteria(),{resourceTypeId:_res.resourceType.id,displayName:_param.name});				
 			var mDefs = MeasurementDefinitionManager.findMeasurementDefinitionsByCriteria(criteria);
-			println(mDefs);
-			if (mDefs.size()!=1) {
+			var index = -1
+			for (i=0;i<mDefs.size();i++) {
+				if (mDefs.get(i).displayName == _param.name) {
+					index = i;
+					break;
+				}
+			}
+			if (index == -1) {
 				throw "Unable to retrieve measurement definition, this is a bug"
 			}
-			return mDefs.get(0).id;
+			return mDefs.get(index).id;
 		};
 		return {
 			/**
@@ -1366,14 +1981,18 @@ var Resource = function (param) {
 			getLiveValue : function() {
 				common.trace("Resource("+_res.id+").metrics.["+param.name+"].getLiveValue()");				
 				var defId = _defId();
-				var values = MeasurementDataManager.findLiveData(_res.id,[defId])
-				var value = values.get(0);
-				return String(value.value);
+				var values = MeasurementDataManager.findLiveData(_res.id,[defId]).toArray()
+				// values is returned as set
+				if (values.length>0) {
+					return String(values[0].value);
+				}
+				common.info("No live value retrieved!");
+				
 			},
 			/**
 			 * enables/disables metric and sets its collection interval
 			 * @param enabled {Boolean} - enable or disable metric
-			 * @param interval {Number} - optinally set collection interval
+			 * @param interval {Number} - optinally set collection interval (seconds)
 			 */
 			set : function(enabled,interval) {
 				common.trace("Resource("+_res.id+").metrics.["+param.name+"].set(enabled="+enabled+",interval="+interval+")");
@@ -1402,11 +2021,11 @@ var Resource = function (param) {
   }
   common.debug("Enumerating metrics")
   var _metrics = {};
-//  for (index in param.measurements) {
-//	  var metric = new Metric(param.measurements[index],param);
-//	  var _metricName = _shortenMetricName(metric.name);
-//	  _metrics[_metricName] = metric;
-//  }
+  for (index in param.measurements) {
+	  var metric = new Metric(param.measurements[index],param);
+	  var _metricName = _shortenMetricName(metric.name);
+	  _metrics[_metricName] = metric;
+  }
   var _retrieveContent = function(destination) {
 		var self = ProxyFactory.getResource(_id);
 		var func = function() {
@@ -1505,7 +2124,7 @@ var Resource = function (param) {
 				if (histories.get(0).getStatus() != OperationRequestStatus.INPROGRESS) {
 					return histories.get(0);
 				}
-				common.info("Operation in progress..");
+				common.debug("Operation in progress..");
 			};
 		};
 		common.debug("Waiting for result..");
@@ -1537,6 +2156,42 @@ var Resource = function (param) {
 			}
 		}
 	};
+	var _checkOperationName = function(name){
+		// let's obtain operation definitions, so we can check operation name
+		var criteria = new ResourceTypeCriteria();
+		criteria.addFilterId(_find().get(0).resourceType.id);
+		criteria.fetchOperationDefinitions(true);
+		var resType = ResourceTypeManager.findResourceTypesByCriteria(criteria).get(0);
+		var iter = resType.operationDefinitions.iterator();
+		// we put op names here in case invalid name is called
+		var ops="";
+		while(iter.hasNext()) {
+			var operationDefinition = iter.next();
+			ops+=operationDefinition.name+", ";
+			if (name==operationDefinition.name) {
+				return operationDefinition;	
+			}
+		}
+		throw "Operation name ["+name+"] is invalid for this resource, valid operation names are : " + ops;	
+	};
+	var _createOperationConfig = function(params, operationDefinition){
+		var configuration = null;
+		if (params || params == {}) {
+			configuration = common.hashAsConfiguration(params);
+		}
+		else if (operationDefinition.parametersConfigurationDefinition){
+			var template = operationDefinition.parametersConfigurationDefinition.defaultTemplate;
+			common.trace("Default template for parameters configuration definition" + template);
+			if (template) {
+				configuration = template.createConfiguration();
+			}
+		}
+		// if (configuration)
+		// pretty.print(configuration);
+		// println(common.objToString(common.configurationAsHash(configuration)));
+		
+		return configuration;
+	}
 
 
 	var _static =  {
@@ -1653,13 +2308,14 @@ var Resource = function (param) {
 				common.debug("Resource deletion finished with status : "+result.status);
 			}
 			if (result && result.status == DeleteResourceStatus.SUCCESS) {
+				common.debug("Resource was removed from inventory");
 				return true;
 			}
 			if (!result) {
 				common.info("Resource deletion still in progress, giving up...");
 				return false;
 			}
-			common.debug("Resource deletion failed, reason : "+result.errorMessage);
+			common.info("Resource deletion failed, reason : "+result.errorMessage);
 			return false;
 		},
 		/**
@@ -1733,6 +2389,9 @@ var Resource = function (param) {
 			if (update.status == ConfigurationUpdateStatus.FAILURE) {
 				common.info("Resource configuration update failed : "+update.errorMessage);
 			}
+			else if (update.status == ConfigurationUpdateStatus.SUCCESS) {
+				common.info("Resource configuration was updated");
+			}
 			return update.status == ConfigurationUpdateStatus.SUCCESS;
 		},
 		/**
@@ -1765,7 +2424,7 @@ var Resource = function (param) {
 		 * @param {Object} params can contain following: -
 		 * <ul>
 		 * <li>name [String] (required)- name for a new resource child, name is optional when `content` is provided</li>
-		 * <li>type [String] (required) - resource type name to be created</li>
+		 * <li>type [String] (required) - resource type name to be created (exact name, not just filter)</li>
 		 * <li>config [Object] (optional) - configuration map for new resource, if not present, default is taken</li>
 		 * <li>pluginConfig [Object] (optional) - plugin configuration for new resource, if not present, default is taken (NOT YET IMPLEMENTED)</li>
 		 * <li>content [String] (optional) - absolute path for resource's content file (typical for deployments)</li>
@@ -1806,8 +2465,10 @@ var Resource = function (param) {
 			criteria.fetchPluginConfigurationDefinition(true);
 			var resTypes = ResourceTypeManager.findResourceTypesByCriteria(criteria);
 			var failed = resTypes.size() == 0;
+			var resType = null;
 			for (var i=0;i<resTypes.size();i++) {
 				if (resTypes.get(i).name == type) {
+					resType = resTypes.get(i);
 					failed = false;
 					break;
 				}
@@ -1821,7 +2482,6 @@ var Resource = function (param) {
 				}
 				throw "Invalid resource type [type="+type+"] valid type names are ["+types+"]";
 			}
-			var resType = resTypes.get(0);
 			var configuration =  new Configuration();
 		    if (config) {
 		    	configuration = common.hashAsConfiguration(config);
@@ -1839,7 +2499,7 @@ var Resource = function (param) {
 				common.debug("Reading file " + content + " ...");
 				var file = new java.io.File(content);
 				if (!file.exists()) {
-					throw "content parameter file does not exist!";
+					throw "content parameter file '" +content+ "' does not exist!";
 				}
 			    var inputStream = new java.io.FileInputStream(file);
 			    var fileLength = file.length();
@@ -1877,7 +2537,15 @@ var Resource = function (param) {
 				);
 			}
 			var pred = function() {
-				var histories = ResourceFactoryManager.findCreateChildResourceHistory(_id,startTime,new Date().getTime(),pageControl);
+				var actualDateMilis = new Date().getTime();
+				common.trace("Searching for CreateChildResourceHistory. Res id: "+_id+", startTime: "+new Date(startTime)+
+						", actualDateMilis: "+new Date(actualDateMilis));
+				var histories = ResourceFactoryManager.findCreateChildResourceHistory(_id,startTime,actualDateMilis,pageControl);
+				//TODO check this on other relevant parts or use time from server
+				if(histories.size() == 0){
+					common.warn("No history found inside given range. The cause of this could be that time" +
+							" on machine witch CLI client and on machine with RHQ server is not synchronised.");
+				}
 				var current;
 				common.pageListToArray(histories).forEach(
 						function (x) {
@@ -1910,6 +2578,9 @@ var Resource = function (param) {
 					common.info("Resource child was successfully created, but it's autodiscovery timed out!");
 					return;
 				}
+				else {
+					common.info("Resource child was successfully created");
+				}
 				return resources.find({parentResourceId:_id,resourceTypeId:resType.id,resourceKey:result.newResourceKey})[0];
 			}
 			common.debug("Resource creation failed, reason : "+result.errorMessage);
@@ -1929,49 +2600,63 @@ var Resource = function (param) {
 		 * timeout is reached or operation finishes
 		 *
 		 * @param {String}
-		 *            name of operation
+		 *            name of operation (required)
 		 * @param {Object}
-		 *            params - hashmap for operation params (Configuration)
-		 * @returns
+		 *            params - hashmap for operation params (Configuration) (optional)
+		 * @type {Object}
+		 * @returns javascript object (hashmap) with following keys:
+		 * <ul>
+		 * <li>status {String} - operation status<li>
+		 * <li>error {String} - operation error message</li>
+		 * <li>result {Object} -  result configuration</li>
+		 * <ul>
 		 */
 		invokeOperation : function(name,params) {
 			common.trace("Resource("+_id+").invokeOperation(name="+name+",params={"+common.objToString(params)+"})");
 			// let's obtain operation definitions, so we can check operation
-			// name and required params
-			var criteria = new ResourceTypeCriteria();
-			criteria.addFilterId(_find().get(0).resourceType.id);
-			criteria.fetchOperationDefinitions(true);
-			var resType = ResourceTypeManager.findResourceTypesByCriteria(criteria).get(0);
-			var iter = resType.operationDefinitions.iterator();
-			// we put op names here in case invalid name is called
-			var ops="";
-			while(iter.hasNext()) {
-				var op = iter.next();
-				ops+=op.name+", ";
-				if (name==op.name) {
-					var configuration = null;
-					if (params || params == {}) {
-						configuration = common.hashAsConfiguration(params);
-					}
-					else if (op.parametersConfigurationDefinition){
-						var template = op.parametersConfigurationDefinition.defaultTemplate;
-						common.trace("Default template for parameters configuration definition" + template);
-						if (template) {
-							configuration = template.createConfiguration();
-						}
-					}
-					// if (configuration)
-					// pretty.print(configuration);
-					// println(common.objToString(common.configurationAsHash(configuration)));
+			var op = _checkOperationName(name);
+			var configuration = _createOperationConfig(params,op);
+			_checkRequiredConfigurationParams(op.parametersConfigurationDefinition,common.configurationAsHash(configuration));
 
-					_checkRequiredConfigurationParams(op.parametersConfigurationDefinition,common.configurationAsHash(configuration));
+			var resOpShedule = OperationManager.scheduleResourceOperation(_id,name,0,0,0,0,configuration,null);
+			common.info("Operation ["+name+"] scheduled");
+			var result = _waitForOperationResult(_id,resOpShedule);
+			var ret = {}
+			ret.status = String(result.status)
+			ret.error = String(result.errorMessage)
+			ret.result = common.configurationAsHash(result.results,op.resultsConfigurationDefinition);
+			return ret;
+		},
+		/**
+		 * schedules operation on resource. In contrast to invokeOperation this is
+		 * not blocking (synchronous) operation.
+		 *
+		 * @param {String}
+		 *            name of operation (required)
+		 *            
+		 * @param {long} delay delay in seconds (required)
+		 * @param {long} repeatInterval repeatInterval in seconds (required)
+		 * @param {int} repeatCount repeatCount in seconds (required)
+		 * @param {Object}
+		 *            opParams - hashmap for operation params (Configuration) (optional)
+		 * @returns
+		 */
+		scheduleOperation : function(name,delay,repeatInterval,repeatCount,opParams) {
+			common.trace("Resource("+_id+").scheduleOperation(name="+name+", delay="
+					+delay+", repeatInterval="+repeatInterval+", repeatCount="+repeatCount+
+					", opParams={"+common.objToString(opParams)+"})");
+			if(delay < 0){throw "Delay of scheduled operation must be >= 0 !!!";}
+			if(repeatInterval < 0){throw "Repeat interval of scheduled operation must be >= 0 !!!";}
+			if(repeatCount < 0){throw "Repeat count of scheduled operation must be >= 0 !!!";}
+			
+			// let's obtain operation definitions, so we can check operation
+			var op = _checkOperationName(name);
+			var configuration = _createOperationConfig(opParams,op);
+			_checkRequiredConfigurationParams(op.parametersConfigurationDefinition,common.configurationAsHash(configuration));
 
-					var resOpShedule = OperationManager.scheduleResourceOperation(_id,name,0,0,0,0,configuration,null);
-					common.debug("Operation scheduled..");
-					return _waitForOperationResult(_id,resOpShedule);
-				}
-			}
-			throw "Operation name ["+name+"] is invalid for this resource, valid operation names are : " + ops;
+			var resOpShedule = OperationManager.scheduleResourceOperation(_id,name,delay * 1000,
+					repeatInterval * 1000,repeatCount,0,configuration,null);
+			common.info("Operation scheduled");
 		},
 		/**
 		 * Waits until operation is finished or timeout is reached.
@@ -2004,7 +2689,7 @@ var Resource = function (param) {
 		/**
 		 * wait's until resource becomes UP or timeout is reached
 		 *
-		 * @returns true if became is available, false otherwise
+		 * @returns true if resource became or is available, false otherwise
 		 * @type Boolean
 		 */
 		waitForAvailable : function() {
@@ -2012,6 +2697,20 @@ var Resource = function (param) {
 			return common.waitFor(function() {
 				if (!_isAvailable()) {
 					common.info("Waiting for resource availability=UP");
+				} else { return true; }
+			});
+		},
+		/**
+		 * wait's until resource becomes DOWN or timeout is reached
+		 *
+		 * @returns true if resource became or is DOWN, false otherwise
+		 * @type Boolean
+		 */
+		waitForNotAvailable : function() {
+			common.trace("Resource("+_id+").waitForNotAvailable()");
+			return common.waitFor(function() {
+				if (_isAvailable()) {
+					common.debug("Waiting for resource availability=DOWN");
 				} else { return true; }
 			});
 		},
@@ -2037,6 +2736,9 @@ var Resource = function (param) {
 			);
 			common.debug("Waiting 5s for sync..");
 			sleep(5*1000);
+			if (result) {
+				common.info("Resource was removed from inventory");
+			}
 			return result;
 		}
 	};
@@ -2049,134 +2751,6 @@ var Resource = function (param) {
 };
 
 
-//
-/**
-* Function - Gets configuration parameter boolean value for given configuration object
-* 
-* @param - configuration // config object
-* @param - configProperty //configuration property	 
-*	
-*            
-* @return - isEnabled // boolean
-*/
-var isConfigPropertyEnabled = function(configuration, configProperty){
-	var isEnabled = configuration.getSimple(configProperty).getBooleanValue();
-
-	return isEnabled;
-}
-
-
-/**
-* Function - Wait For Configuration To Update
-* 
-* @param	update  //  configuation update result	
-* @param	resourceId
-*	
-*            
-* @return - updateStatus //boolean
-*/
-
-var waitForConfigurationToUpdate = function(update, resourceId){
-	var common = new _common();
-	if (!update) {
-		common.debug("Configuration has not been changed");
-		return;
-	}
-	if (update.status == ConfigurationUpdateStatus.INPROGRESS) {
-		var pred = function() {
-			var up = ConfigurationManager.getLatestResourceConfigurationUpdate(resourceId);
-			if (up) {
-				return up.status != ConfigurationUpdateStatus.INPROGRESS;
-			}
-		};
-		common.debug("Waiting for configuration to be updated...");
-		var result = common.waitFor(pred);
-		if (!result) {
-			throw "Resource configuration update timed out!";
-		}
-		update = ConfigurationManager.getLatestResourceConfigurationUpdate(resourceId);
-	}
-	common.debug("Configuration update finished with status : "+update.status);
-	if (update.status == ConfigurationUpdateStatus.FAILURE) {
-		common.info("Resource configuration update failed : "+update.errorMessage);
-	}
-	return update.status == ConfigurationUpdateStatus.SUCCESS;
-}
-
-/**
-* Function - Update  Configuration, check update is done, change config back
-* 
-* @param	resourceId  //  resource Id
-* @param	oldConfiguration 
-* @param 	configPropValue // String config property value
-*	isEnabled // boolean
-*            
-* @return - 
-*/
-var updateConfigurationString = function(resourceId, configuration, configProperty, configPropValue ){
-	var common = new _common();
-	println(configuration);
-	var configValue = configuration.getSimple(configProperty).stringValue;
-
-
-	//update config
-	configuration.setSimpleValue(configProperty, configPropValue ); 
-	var update = ConfigurationManager.updateResourceConfiguration(resourceId, configuration);
-	if(!(waitForConfigurationToUpdate(update,resourceId))){
-		return ;
-	}
-
-	var newConfiguration = ConfigurationManager.getResourceConfiguration(resourceId);
-	var configValueNew1 = newConfiguration.getSimple(configProperty).stringValue;
-	assertTrue(configValueNew1 == configPropValue, "Updating  "+ configProperty +" configuration failed!!");
-
-
-	// update configuration back
-	newConfiguration.setSimpleValue(configProperty, configValue); 
-	var update = ConfigurationManager.updateResourceConfiguration(resourceId, newConfiguration);
-	
-	if(!(waitForConfigurationToUpdate(update,resourceId))){
-		return ;
-	}
-	var newConfiguration2 = ConfigurationManager.getResourceConfiguration(resourceId);
-	var configValueNew2 = newConfiguration2.getSimple(configProperty).stringValue;
-
-
-	assertTrue(!configValueNew1.equals(configValueNew2) , "Updating  "+ configProperty +" configuration failed!!");
-	assertTrue(configValueNew2 == configValue , "Updating  "+ configProperty +" configuration failed!!");
-	
-}
-
-
-/**
-* Function - Update n Configuration
-* 
-* @param - resourceId  // n resource Id
-* @param	oldConfiguration 
-* @param	isEnabled // boolean
-*            
-* @return - newConfiguration
-*/
-
-var updateConfigurationBoolean = function(resourceId,configuration,configProperty,isEnabled ){
-
-if (isEnabled == true){
-	configuration.setSimpleValue(configProperty,  "false"); 
-}
-else {
-	configuration.setSimpleValue(configProperty,  "true"); 
-	}
-
-var update = ConfigurationManager.updateResourceConfiguration(resourceId, configuration);
-var configUpdateStatus = waitForConfigurationToUpdate(update,resourceId);
-if(!configUpdateStatus){
-	return ;
-}
-var newConfiguration = ConfigurationManager.getResourceConfiguration(resourceId);
-
-return newConfiguration;
-
-}
 
 /**
  * @lends _global_
@@ -2185,7 +2759,7 @@ var Inventory = resources;
 Inventory.discoveryQueue = discoveryQueue;
 
 /**
- * verbosity, default 0 (0=INFO, 1=DEBUG,2=TRACE)
+ * verbosity, default 0 (-2=ERROR, -1=WARN, 0=INFO, 1=DEBUG, 2=TRACE)
  */
 var verbose = 0;
 /**
@@ -2216,6 +2790,9 @@ if (typeof exports !== "undefined") {
 	exports.bundles = bundles;
 	exports.groups = groups;
 	exports.Resource = Resource;
+	exports.roles = roles;
+	exports.users = users;
+	exports.permissions = permissions;
   exports.initialize = initialize;
 }
 
