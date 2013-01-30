@@ -15,12 +15,14 @@ Contributed by Libor Zoubek & Filip Brychta
 # What can be achieved using this library?
  * easy way to locate your resource within inventory (see `examples/resources.js`)
  * retrieve/update configuration for resource
- * run resource operations (see `examples/resourceOperations.js`)
+ * run or schedule resource operations (see `examples/resourceOperations.js`)
  * create child resources
+ * check resource metrics (see `examples/resourceMetrics.js`)
  * delete or uninventory resource
  * create resource groups (MIXED and COMPATIBLE) (see `examples/groups.js`)
  * upload/deploy bundles (see `examples/bundles.js`)
-
+ * create users and roles (see `examples/roles.js`)
+ 
 See [generated JSDoc] (http://lzoubek.github.com/samples/rhqapi/) for more details.
 
 # How to consume this library

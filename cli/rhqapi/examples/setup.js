@@ -7,7 +7,7 @@ var rhqapi = require("modules:/rhqapi");
 
 // rhqapi.js can produce some output so you can actually see, what is happening behind the scenes
 // you can adjust verbosity of api
-// there are 3 levels, info=0, debug=1, trace=2
+// there are 5 levels (default 0), -2=error, -1=warn, info=0, debug=1, trace=2
 var verbose = 2 // will start producing trace messages
 
 // as rhqapi tries to be synchronous and RHQ Java remote API itself is asynchronous, you can adjust timeouts
