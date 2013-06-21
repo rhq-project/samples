@@ -19,13 +19,13 @@ ts = long(time()*1000)  # TODO how to get ms resolution?
 
 val = random.randint(1,100)
 
-pointdata = {'timeStamp':ts,'value':val}
+pointdata = {'value':val}
 point = json.dumps(pointdata)
 
 print "Point = " , point
 
 i = 10022
-uri = "http://localhost:7080/rest/1/metric/data/" + str(scheduleId) + "/raw/" + str(ts)
+uri = "http://localhost:7080/rest/metric/data/" + str(scheduleId) + "/raw/" + str(ts)
 
 print "Posting to " , uri , "\n\n"
 
