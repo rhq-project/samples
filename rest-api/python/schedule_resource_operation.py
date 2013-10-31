@@ -30,12 +30,11 @@ for opdef in req.json():
         op = req.json()
         # fix operation body and set operation parameters
         op['readyToSubmit'] = True
-        del op['links']
         op['params'] = {'detailedDiscovery':False}
         # finally we can schedule our operation
         print 'Scheduling..'
         req = requests.put(endpoint+'operation/%d' % op['id'],json.dumps(op),headers=headers,auth=auth)
-        history_url = req.json()['links'][0]['history']['href']
+        history_url = [x for x in req.json()['links'] if x.has_key('history')][0]['history']['href']
         result = requests.get(history_url,headers=headers,auth=auth)
         data = result.json()
         # wait for it
