@@ -42,8 +42,11 @@ handle = req.json()['value']
 
 data = {'resourceName':'hello.war','parentId':resource['resourceId'],'typeName':'Deployment','pluginName':'JBossAS7','resourceConfig':{'runtimeName':'hello.war'}}
 print 'Creating resource'
+# we should get new resource as a response 
 req = requests.post(endpoint+'resource?handle=%s' % handle, json.dumps(data),auth=auth,headers=headers)
-print req.text
-# TODO wait for creation history to get success or failure
+if req.status_code == 200:
+    print req.json()
+else:
+    print 'Error during creating resource, server returned %d : %s' % (req.status_code,req.text)
 
 
