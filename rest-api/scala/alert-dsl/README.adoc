@@ -1,0 +1,66 @@
+== simple alert domain specific language 
+
+This tiny project contains a simple DSL (internal) written in Scala language, so that it can be run on top of JVM.
+
+== Dependencies
+
+--
+. Java
+. link:http://www.scala-lang.org/download/[Scala]
+. link:http://www.scala-sbt.org/release/docs/Getting-Started/Setup.html[Sbt]
+--
+
+== Usage
+For running the prepared demo App all is needed is:
+
+ $ sbt run
+
+This will define three simple alerts on your platform resource (assumes id +10001+). It assumes the RHQ server to be running. For interactive mode just type:
+
+ $ sbt console
+
+== Examples
+First define the alerts:
+[source, scala]
+  val alert1 =
+    define alert having {
+      name -> "foo"
+      description -> "test"
+      priority -> HIGH
+      enabled -> true
+      conditions all(
+        CONFIG CHANGED,
+        AVAILABILITY STAYS DOWN FOR 1 HOUR
+      )
+      dampening -> (2 from 4 last evaluations)
+    }
+     
+  val alert2 =
+    define alert having {
+      name -> "bar"
+      priority -> LOW
+      enabled -> false
+      conditions any (AVAILABILITY GOES DOWN)
+      dampening -> (2 consecutive evaluations)
+    }
+     
+  val alert3 =
+    define alert having {
+      name -> "baz"
+      conditions any(
+        "viewProcessList" OPERATION HAS STATUS FAILURE,
+        AVAILABILITY STAYS DOWN FOR 42 MINUTES
+      )
+      dampening -> (in last 25 minutes 3 times)
+    }
+  
+  
+Now create the defined alerts using async POST calls on REST endpoint
+[source, scala]
+  val futureAlert1: Future[Response] = server create alert1 on resource withId 10001
+  val futureAlert2: Future[Response] = server create alert2 on resource withId 10001
+
+The default hostname and credentials can be changed  
+[source, scala]
+  val myServer = server withHostName("http://localhost:7080") withCredentials("rhqAdmin", "rhqAdmin")
+  val futureAlert3 = myServer create alert3 on resource withId 10001
