@@ -20,50 +20,47 @@ This will define three simple alerts on your platform resource (assumes id +1000
  $ sbt console
 
 == Examples
-
-[source,scala,numbered]
+First define the alerts:
+[source, scala]
   val alert1 =
     define alert having {
       name -> "foo"
       description -> "test"
       priority -> HIGH
       enabled -> true
-
       conditions all(
         CONFIG CHANGED,
         AVAILABILITY STAYS DOWN FOR 1 HOUR
-        )
+      )
       dampening -> (2 from 4 last evaluations)
     }
-
+     
   val alert2 =
     define alert having {
       name -> "bar"
       priority -> LOW
       enabled -> false
-
-      conditions any (
-        AVAILABILITY GOES DOWN
-        )
-
+      conditions any (AVAILABILITY GOES DOWN)
       dampening -> (2 consecutive evaluations)
     }
-
+     
   val alert3 =
     define alert having {
       name -> "baz"
-
       conditions any(
         "viewProcessList" OPERATION HAS STATUS FAILURE,
         AVAILABILITY STAYS DOWN FOR 42 MINUTES
-        )
+      )
       dampening -> (in last 25 minutes 3 times)
     }
-
-
-  // create the alerts on the RHQ server using POST method on REST endpoint
+  
+  
+Now create the defined alerts using async POST calls on REST endpoint
+[source, scala]
   val futureAlert1: Future[Response] = server create alert1 on resource withId 10001
   val futureAlert2: Future[Response] = server create alert2 on resource withId 10001
 
-  // the default hostname and credentials can be changed
-  val futureAlert3 = server withHostName("http://localhost:7080") withCredentials("rhqAdmin", "rhqAdmin") create alert3 on resource withId 10001
+The default hostname and credentials can be changed  
+[source, scala]
+  val myServer = server withHostName("http://localhost:7080") withCredentials("rhqAdmin", "rhqAdmin")
+  val futureAlert3 = myServer create alert3 on resource withId 10001
