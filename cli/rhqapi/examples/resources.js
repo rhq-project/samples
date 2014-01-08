@@ -2,7 +2,7 @@
 * resources.js
 *  
 * This example shows how to use rhqapi.js to query RHQ Inventory
-* the rhqapi.js query API has been simplified. If you take look at ResourceCriteria class and its methods addFilter<key>, 
+* the rhqapi.js query API has been simplified. If you take look at org.rhq.core.domain.criteria.ResourceCriteria class and its methods addFilter<key>, 
 * you can use all these <key>s in this query API and even more - there are shortcuts for long key names and 
 * also for Enum keys and values (like ResourceCategory or AvailabilityType)
 * 

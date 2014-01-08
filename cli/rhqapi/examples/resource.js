@@ -2,7 +2,7 @@
 * resource.js
 * 
 * This example shows basics about Resource object from rhqapi.js and also a way to configure a resource.
-* For more see resourceOperations.js and resourceCreate.js 
+* For more see resourceOperations.js and resourceCreateChild.js 
 * @author Libor Zoubek <lzoubek@redhat.com>
 */
 
