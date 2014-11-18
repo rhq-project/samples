@@ -10,7 +10,7 @@
 var rhqapi = require("modules:/rhqapi");
 
 
-// you can create a resource just by passing and ID
+// lets obtain first platform found
 var resource = rhqapi.resources.platforms()[0]
 
 // run discovery operation on platform resource - no need to pass any parameters, defaults are taken
@@ -29,3 +29,6 @@ println(result["error"])
 // scheduling operation does not return nothing
 //
 resource.scheduleOperation("discovery",0,600,10,{detailedDiscovery:false})
+
+// operation can be scheduled using cron expression
+resource.scheduleOperationUsingCron("discovery","0 * * * *",{detailedDiscovery:false});

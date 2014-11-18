@@ -2,7 +2,9 @@
  * bundles.js
  *
  * This example shows how bundle subsystem can be used using rhqapi.js.
- * We'll also show how to use groups, for more info about groups see groups.js
+ * We'll also show how to use resource groups, for more info about groups see groups.js
+ * Since RHQ 4.9.0 you can assign bundles to bundleGroups, see bundleGroups.js
+ * for more examples.
  */
 var rhqapi = require("modules:/rhqapi.js");
 
@@ -22,9 +24,8 @@ bundles.forEach(function(bundle) {
   } 
 );
 
-
 // create bundle on server
-var bundle = rhqapi.bundles.createFromDistFile("/path/to/bundle/distribution/file.zip");
+var bundle = rhqapi.bundles.create({dist:"/path/to/bundle/distribution/file.zip"});
 
 // to be able to create a destination, we need compatible resource group, let's create a group of all platforms
 var group = rhqapi.groups.create("all platforms",rhqapi.resources.platforms());

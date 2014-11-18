@@ -13,17 +13,25 @@ Contributed by Libor Zoubek & Filip Brychta
  by representing every possible object as javascript object or function
 
 # What can be achieved using this library?
- * easy way to locate your resource within inventory (see `examples/resources.js`)
- * retrieve/update configuration for resource
- * run or schedule resource operations (see `examples/resourceOperations.js`)
- * create child resources
- * check resource metrics (see `examples/resourceMetrics.js`)
- * delete or uninventory resource
- * create resource groups (MIXED and COMPATIBLE) (see `examples/groups.js`)
- * upload/deploy bundles (see `examples/bundles.js`)
- * create users and roles (see `examples/roles.js`)
+ * Resources 
+  * easy way for locating within inventory - [example](examples/resources.js)
+  * retrieve/update configuration - [example](examples/resource.js)
+  * run or schedule operations - [example](examples/resourceOperations.js)
+  * create child resources - [example](examples/resourceCreateChild.js)
+  * check metric values - [example](examples/resourceMetrics.js)
+  * delete or uninventory - [example](examples/resource.js)
+ * Resource groups 
+  * create/remove (MIXED and COMPATIBLE) - [example](examples/groups.js)
+  * operations - [example](examples/groupOperations.js)
+ * Bundles
+  * bundle groups - [example](examples/bundleGroups.js)
+  * upload/deploy - [example](examples/bundles.js)
+ * manipulating dynaGroups - [example](examples/dynaGroups.js)
+ * locate resource types - [example](examples/resourceTypes.js)
+ * locate/update metric templates - [example](examples/metricTemplates.js)
+ * create users and roles - [example](examples/roles.js)
  
-See [generated JSDoc] (http://lzoubek.github.com/samples/rhqapi/) for more details.
+And much more! See [generated JSDoc] (http://lzoubek.github.com/samples/rhqapi/) for more details.
 
 # How to consume this library
 

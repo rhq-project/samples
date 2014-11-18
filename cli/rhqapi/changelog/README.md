@@ -1,5 +1,14 @@
 # rhqapi.js changelog
 
+# version 0.3
+ * Resource extended (calltime metircs, alert definitions)
+ * added support for group operations (run, schedule)
+ * added support for dynaGroups
+ * added bundleGroups
+ * bundles fixed to use streaming remote API when available (useful for large
+ deployments)
+ * suport for resource types and metric templates
+
 # version 0.2
  * fixed: bundle deployment fails when CLI runs on different host then server
  * improved logging - added more levels, INFO (default) now notifies user 
