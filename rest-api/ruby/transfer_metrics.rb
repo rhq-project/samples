@@ -9,8 +9,11 @@ load 'RHQconfig.rb'
 
 
 
-# id of the schedule of the metric to transfer
-schedule_id = 10007
+# ids of the schedules of the metric to transfer + their display name
+SCHEDULES = { 10007 => 'RHQ.snert.memory.free',
+              10005 => 'RHQ.snert.memory.actualFree',
+              10003 => 'RHQ.snert.cpu.user'}
+
 
 # time range [ now - duration, now ] - default 1 day
 duration = 1 * 24 * 3600 # seconds
@@ -18,40 +21,46 @@ duration = 1 * 24 * 3600 # seconds
 # url of the rhq-metrics server to use
 rhqm_url = 'http://10.3.10.81:8080/rhq-metrics/metrics'
 
-config = RHQConfig.new("rhqadmin","rhqadmin")
+config = RHQConfig.new('rhqadmin', 'rhqadmin')
 
 #####
 
-source = "Metric_#{schedule_id}"
+
 
 base_url = config.base_url
 
 end_time = Time::now.to_i
 start_time = end_time - 1000 * duration
-response = RestClient.get base_url + "metric/data/#{schedule_id}/raw.json?start=#{start_time}&end=#{end_time}"
 
-data = JSON.parse(response)
 
-outgoing = []
+SCHEDULES.each do |schedule_id,name|
 
-data.each do |item|
-  print item['timeStamp'].to_s + ' => ' + item['value'].to_s + "\n"
+  print "Transferring #{name} (#{schedule_id})\n"
+  response = RestClient.get base_url + "metric/data/#{schedule_id}/raw.json?start=#{start_time}&end=#{end_time}"
 
-  simple_metric = {:id => source, :value => item['value'], :timestamp => item['timeStamp']}
+  outgoing = []
 
-  outgoing.push(simple_metric)
+  data = JSON.parse(response)
+  data.each do |item|
+
+    simple_metric = {:id => name, :value => item['value'], :timestamp => item['timeStamp']}
+    outgoing.push(simple_metric)
+
+  end
+
+  print "   -> #{outgoing.size} items\n"
+
+  json_data = JSON.generate(outgoing)
+
+  rhqm_request = RestClient::Request.new(
+          :method => 'POST',
+          :url => rhqm_url,
+          :headers => { :accept => :json, :content_type => :json},
+          :payload => json_data
+  )
+
+  rhqm_response = rhqm_request.execute
+
+  print "   <- #{RestClient::STATUSES[rhqm_response.code]} (#{rhqm_response.code})\n"
 
 end
-
-json_data = JSON.generate(outgoing)
-
-rhqm_request = RestClient::Request.new(
-        :method => 'POST',
-        :url => rhqm_url,
-        :headers => { :accept => :json, :content_type => :json},
-        :payload => json_data
-)
-
-rhqm_response = rhqm_request.execute
-
-print rhqm_response
