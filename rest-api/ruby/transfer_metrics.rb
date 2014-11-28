@@ -6,14 +6,15 @@
 require 'rest_client'
 require 'JSON'
 load 'RHQconfig.rb'
+load 'RHQutil.rb'
 
 
 
-# ids of the schedules of the metric to transfer + their display name
-SCHEDULES = { 10007 => 'RHQ.snert.memory.free',
-              10005 => 'RHQ.snert.memory.actualFree',
-              10003 => 'RHQ.snert.cpu.user'}
-
+# ids of the schedules of the metric to transfer
+SCHEDULE_IDS = [ 10007 ,
+              10005,
+              10003 ]
+SCHEDULE_PREFIX = 'RHQ'
 
 # time range [ now - duration, now ] - default 1 day
 duration = 1 * 24 * 3600 # seconds
@@ -27,26 +28,45 @@ config = RHQConfig.new('rhqadmin', 'rhqadmin')
 
 
 
-base_url = config.base_url
-
-end_time = Time::now.to_i
-start_time = end_time - 1000 * duration
 
 
-SCHEDULES.each do |schedule_id,name|
-
-  print "Transferring #{name} (#{schedule_id})\n"
-  response = RestClient.get base_url + "metric/data/#{schedule_id}/raw.json?start=#{start_time}&end=#{end_time}"
-
+def generate_outgoing_batch(data, name)
   outgoing = []
 
-  data = JSON.parse(response)
   data.each do |item|
 
     simple_metric = {:id => name, :value => item['value'], :timestamp => item['timeStamp']}
     outgoing.push(simple_metric)
 
   end
+  outgoing
+end
+
+def populate_schedules(base_url)
+  SCHEDULE_IDS.each do |x|
+    s = RHQ_util.get_schedule_for_id(base_url,x)
+    SCHEDULES[x] = SCHEDULE_PREFIX + '.' + s['scheduleName']
+  end
+end
+
+
+
+############### main ###########
+SCHEDULES = {}
+
+base_url = config.base_url
+
+populate_schedules(base_url)
+
+end_time = Time::now.to_i
+start_time = end_time - 1000 * duration
+
+
+
+SCHEDULES.each do |schedule_id,name|
+
+  data = RHQ_util.get_metric_data_from_rhq(base_url, schedule_id, start_time, end_time, name)
+  outgoing = generate_outgoing_batch(data, name)
 
   print "   -> #{outgoing.size} items\n"
 
