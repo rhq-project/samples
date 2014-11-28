@@ -8,11 +8,16 @@ require 'JSON'
 load 'RHQconfig.rb'
 
 
-config = RHQConfig.new("rhqadmin","rhqadmin")
+config = RHQConfig.new('rhqadmin', 'rhqadmin')
 
+# Name of resource field + display name that should be shown
+RESOURCE_FIELDS_TO_PRINT = {'resourceName' => 'name',
+                            'resourceId' => 'id',
+                            'typeName' => 'typ',
+                            'availability' => 'availability'}
 
 def dump_resource(resource,level)
-  {'resourceName' => 'name', 'resourceId' => 'id', 'typeName' => 'typ', 'availability' => 'availability'}.each {|key,name|
+  RESOURCE_FIELDS_TO_PRINT.each {|key,name|
     do_indent(level)
     print name + ': ' + resource[key].to_s + "\n"
   }
@@ -53,7 +58,7 @@ def dump_recursive(config, response, level)
 
 
       if level == 0
-        children = get_link(resource, 'children');
+        children = get_link(resource, 'children')
         if children != nil
           print 'Going for ' + children.to_s + "\n"
 

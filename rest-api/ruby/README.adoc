@@ -1,6 +1,6 @@
 # Ruby examples
 
-These require the https://github.com/archiloque/rest-client[rest-client] and JSON gems
+These require the https://github.com/rest-client/rest-client[rest-client] and JSON gems
 
 * get_status.rb -- obtain the system status via REST api
 * link_walker.rb -- traverse through the resource tree by following links
@@ -9,3 +9,14 @@ These require the https://github.com/archiloque/rest-client[rest-client] and JSO
 
 
 They all get their configuration of the RHQ server to use from `RHQ_config.rb`.
+
+## Install gems
+
+If you are not too familiar with Ruby, you can / need to install the `rest-client` gem
+like this:
+
+----
+$ gem install rest-client
+----
+
+The Json-Gem should normally be present already after installing Ruby.

@@ -8,7 +8,7 @@ require 'JSON'
 load 'RHQconfig.rb'
 
 
-config = RHQConfig.new("rhqadmin","rhqadmin")
+config = RHQConfig.new('rhqadmin', 'rhqadmin')
 
 base_url = config.base_url
 
