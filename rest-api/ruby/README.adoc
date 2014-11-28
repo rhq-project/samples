@@ -1,0 +1,11 @@
+# Ruby examples
+
+These require the https://github.com/archiloque/rest-client[rest-client] and JSON gems
+
+* get_status.rb -- obtain the system status via REST api
+* link_walker.rb -- traverse through the resource tree by following links
+* dump_inventory.rb -- list platforms along with their top-level servers
+* transfer_metrics.rb -- shows how to transfer raw metrics data from RHQ to RHQ-Metrics
+
+
+They all get their configuration of the RHQ server to use from `RHQ_config.rb`.

@@ -5,21 +5,18 @@
 
 require 'rest_client'
 require 'JSON'
+load 'RHQconfig.rb'
 
-server = 'localhost'
-port='7080'
-user = 'rhqadmin'
-password = 'rhqadmin'
-rest_base = '/rest/1'
 
-base_url = 'http://' + user+ ':' + password +'@' + server + ':' + port+rest_base + '/'
+config = RHQConfig.new("rhqadmin","rhqadmin")
 
+base_url = config.base_url
 
 response = RestClient.get base_url + 'status.json'
 
 data = JSON.parse(response)
 
-
-data.each do |key,value|
- print key +':' +value.to_s + "\n"
+values = data['values']
+values.each do |key,value|
+ print key.to_s + ': ' +value.to_s + "\n"
 end
