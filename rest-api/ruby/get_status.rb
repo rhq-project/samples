@@ -5,10 +5,10 @@
 
 require 'rest_client'
 require 'JSON'
-load 'RHQconfig.rb'
+load 'RHQ_config.rb'
 
 
-config = RHQConfig.new('rhqadmin', 'rhqadmin')
+config = RHQ_config.new('rhqadmin', 'rhqadmin')
 
 base_url = config.base_url
 

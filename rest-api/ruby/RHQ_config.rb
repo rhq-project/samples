@@ -1,6 +1,6 @@
-class RHQConfig
+class RHQ_config
 
-  def initialize(user = "rhqadmin",password="rhqadmin")
+  def initialize(user = 'rhqadmin', password='rhqadmin')
     @server = 'localhost'
     @port='7080'
     @user = user

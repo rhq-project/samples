@@ -1,19 +1,18 @@
 require 'rest_client'
 require 'JSON'
+load 'RHQ_config.rb'
+load 'RHQ_util.rb'
 
-server = 'localhost'
-port='7080'
-user = 'rhqadmin'
-password = 'rhqadmin'
-rest_base = '/rest/1'
+rhq_config = RHQ_config.new('rhqadmin', 'rhqadmin')
 
-base_url = 'http://' + user+ ':' + password +'@' + server + ':' + port+rest_base + '/'
-start_url = "resource/platforms"
+base_url = rhq_config.base_url
 
-RestClient.log = "stdout"
+start_url = 'resource/platforms'
+
+RestClient.log = 'stdout'
 
 should_finish = false
-print "Url to call " + base_url + start_url + ".json\n\n"
+print 'Url to call ' + base_url + start_url + ".json\n\n"
 response = RestClient.get base_url + start_url + '.json'
 saved_response = response
 
@@ -25,36 +24,36 @@ def handle_links(links)
   return link_list if links.nil? || links.empty?
 
   links.each do | pair |
-    rel = pair["rel"]
-    href = pair["href"]
+    rel = pair[0]
+    href = pair[1]
     meth = case rel
-      when "delete"
-        "DELETE"
-      when "cancel"
-        "DELETE"    # TODO handling after delete - where to jump to?
-      when "update"
-        "PUT"
-      when "create"
-        "POST"
-      when "edit"
+      when 'delete'
+        'DELETE'
+      when 'cancel'
+        'DELETE' # TODO handling after delete - where to jump to?
+      when 'update'
+        'PUT'
+      when 'create'
+        'POST'
+      when 'edit'
         # edit is GET, PUT, DELETE - fake the latter 2 and then
         # let the normal code do the GET
         print i.to_s + ') '+ rel  + ': ' + href + " (edit)\n"
-        item = {"rel" => rel, "href" => href, "meth" => "PUT"}
+        item = {:rel => rel, :href => href, :meth => 'PUT'}
         link_list.push(item)
         i+=1
 
         print i.to_s + ') '+ rel  + ': ' + href + " (delete/cancel)\n"
-        item = {"rel" => rel, "href" => href, "meth" => "DELETE"}
+        item = {:rel => rel, :href => href, :meth => 'DELETE'}
         link_list.push(item)
         i+=1
 
-        "GET"
+        'GET'
       else
-        "GET"
+        'GET'
     end
     print i.to_s + ') '+ rel  + ': ' + href + " (" + meth +")\n"
-    item = {"rel" => rel, "href" => href, "meth" => meth}
+    item = {:rel => rel, :href => href, :meth => meth}
     link_list.push(item)
     i+=1
   end
@@ -63,14 +62,13 @@ end
 
 def print_resource(obj)
   obj.each do |key,value|
-      print "   " + key +':' +value.to_s + "\n" if key != "links"
+      print '   ' + key +':' +value.to_s + "\n" if key != 'links'
   end
 
 end
 
 def select_single_resource(data)
   i= 0
-  link_list = []
 
   data.each do |inner|
     print i.to_s + ") \n"
@@ -78,85 +76,89 @@ def select_single_resource(data)
     i += 1
   end
 
-  print "==> "
+  print '==> '
   inp = gets
   inp = inp.strip
-  res = data[Integer(inp)]
-  link_list.concat(handle_links(res["links"]))
+  data[Integer(inp)]
 
-  link_list
 end
 
-######## main loop
-while (!should_finish)
-  print "Response code " + response.code.to_s + ", " + RestClient::STATUSES[response.code] + "\n"
 
-  if (response.code != 200)
-     response = saved_response
+######## main loop
+until should_finish
+  print 'Response code ' + response.code.to_s + ", " + RestClient::STATUSES[response.code] + "\n"
+
+  if response.code != 200
+    response = saved_response
   end
+
   data = JSON.parse(response)
+
   link_list = []
 
-  if (data.kind_of?(Array))
-    link_list.concat(select_single_resource(data))
+  if data.kind_of?(Array)
+    # link_list.concat(select_single_resource(data,links))
+    res = select_single_resource(data)
+    links = RHQ_util.get_links(response, res)
+    link_list.concat(handle_links(links))
   else
     print_resource(data)
-    link_list.concat(handle_links(data["links"]))
+    links = RHQ_util.get_links(response, data)
+    link_list.concat(handle_links(links))
   end
 
 
   print "q) quit \n"
   print "b) back \n"
-  print "==> "
+  print '==> '
 
   inp = gets
   inp = inp.strip
 
-  if inp=="q"
+  if inp=='q'
     should_finish = true
-  elsif inp=="b"
+  elsif inp=='b'
     response = saved_response
-  elsif inp != ""
+  elsif inp != ''
     item = link_list[Integer(inp)]
-    url = item["href"]
-    method = item["meth"]
+    url = item[:href]
+    method = item[:meth]
     saved_response = response
 
-    resource=""
-    if (method == "PUT")
-      File.open("/tmp/rhq-rest-fu",'w') {|f| f.write(response)} # TODO Don't write the links'
+    resource=''
+    if method == 'PUT'
+      File.open('/tmp/rhq-rest-fu', 'w') { |f| f.write(response) } # TODO Don't write the links'
 
-       #system("/bin/vi", "/tmp/rhq-rest-fu")
-      print "= Now edit /tmp/rhq-rest-fu and then press return here ==>"
+      #system("/bin/vi", "/tmp/rhq-rest-fu")
+      print '= Now edit /tmp/rhq-rest-fu and then press return here ==>'
       gets
 
       # TODO shall we set the state to 'ready'?
 
-     end
+    end
 
-
-    print "Getting " + url.to_s + " with method " + method.to_s + "\n"
-    if (method == "PUT")
-      request = RestClient::Request.new(:method => method,  ##  allow for other methods8
-                                        :url=>url ,
-                                        :user=> user,
-                                        :password=>password,
-                                        :headers => { :accept => :json, :content_type => :json },
+    print 'Getting ' + url.to_s + ' with method ' + method.to_s + "\n"
+    if method == 'PUT'
+      request = RestClient::Request.new(:method => method, ##  allow for other methods8
+                                        :url => url,
+                                        :user => rhq_config.user,
+                                        :password => rhq_config.password,
+                                        :headers => {:accept => :json, :content_type => :json},
                                         :payload => File.new("/tmp/rhq-rest-fu")
       )
     else
-      request = RestClient::Request.new(:method => method,  ##  allow for other methods8
-                                        :url=>url ,
-                                        :user=> user,
-                                        :password=>password,
-                                        :headers => { :accept => :json, :content_type => :json })
+      request = RestClient::Request.new(:method => method, ##  allow for other methods8
+                                        :url => url,
+                                        :user => rhq_config.user,
+                                        :password => rhq_config.password,
+                                        :headers => {:accept => :json, :content_type => :json})
 
     end
-    response = request.execute()
+    response = request.execute
 
-    if (response.code >399)
+    if response.code >399
       response=saved_response
-      print "Got error " + response.code + "\n"
+      print "Got error #{response.code} \n"
     end
   end
 end

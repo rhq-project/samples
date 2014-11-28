@@ -5,8 +5,8 @@
 
 require 'rest_client'
 require 'JSON'
-load 'RHQconfig.rb'
-load 'RHQutil.rb'
+load 'RHQ_config.rb'
+load 'RHQ_util.rb'
 
 
 
@@ -22,7 +22,7 @@ duration = 1 * 24 * 3600 # seconds
 # url of the rhq-metrics server to use
 rhqm_url = 'http://10.3.10.81:8080/rhq-metrics/metrics'
 
-config = RHQConfig.new('rhqadmin', 'rhqadmin')
+config = RHQ_config.new('rhqadmin', 'rhqadmin')
 
 #####
 

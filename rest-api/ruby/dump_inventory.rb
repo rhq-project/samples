@@ -5,13 +5,14 @@
 
 require 'rest_client'
 require 'JSON'
-load 'RHQconfig.rb'
+load 'RHQ_config.rb'
+load 'RHQ_util.rb'
 
 
-config = RHQConfig.new('rhqadmin', 'rhqadmin')
+config = RHQ_config.new('rhqadmin', 'rhqadmin')
 
 # Name of resource field + display name that should be shown
-RESOURCE_FIELDS_TO_PRINT = {'resourceName' => 'name',
+RESOURCE_FIELDS_TO_PRINT = {:resourceName => 'name',
                             'resourceId' => 'id',
                             'typeName' => 'typ',
                             'availability' => 'availability'}
@@ -23,23 +24,11 @@ def dump_resource(resource,level)
   }
   do_indent(level)
   print 'UI-Link: '
-  print get_link(resource,'coregui')
+  print RHQ_util.get_link(resource,'coregui')
   print "\n"
 end
 
 
-def get_link(resource,rel_name)
-
-  link = nil
-
-  links = resource['links']
-  links.each do |x|
-    if x.has_key?(rel_name)
-      link = x[rel_name]['href']
-    end
-  end
-  link
-end
 
 def do_indent(level)
   indent = 0...level
@@ -58,7 +47,7 @@ def dump_recursive(config, response, level)
 
 
       if level == 0
-        children = get_link(resource, 'children')
+        children = RHQ_util.get_link(resource, 'children')
         if children != nil
           print 'Going for ' + children.to_s + "\n"
 
