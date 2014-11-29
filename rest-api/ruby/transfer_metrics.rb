@@ -58,9 +58,10 @@ base_url = config.base_url
 
 populate_schedules(base_url)
 
-end_time = Time::now.to_i
-start_time = end_time - 1000 * duration
+end_time = Time::now
+start_time = end_time -  duration
 
+print "Start #{Time::at(start_time)}  end #{Time::at(end_time)}\n"
 
 
 SCHEDULES.each do |schedule_id,name|

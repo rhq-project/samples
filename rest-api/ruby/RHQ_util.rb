@@ -1,20 +1,42 @@
+##
+# RHQ specific helper methods
+
 class RHQ_util
 
   require 'JSON'
   require 'rest_client'
 
-  def self.get_metric_data_from_rhq(base_url, schedule_id, start_time, end_time, name)
+  ##
+  # Fetches raw metric data from the RHQ server +base_url+ is the base url of the
+  # rest api of the RHQ server. +schedule_id+ denotes the numeric id of the metric
+  # to fetch. +name+ is only used for diagnostic printing and can be omitted.
+  # +start_time+ and +end_time+ denote the desired time range
+  #
+  # The server will return a 406 status code if +start_time+ is before now - 7 days.
+
+  def self.get_metric_data_from_rhq(base_url, schedule_id, start_time, end_time, name='-unset-')
+    # passed time are time objects and to_i returns seconds since epoch.
+    st = start_time.to_i * 1000
+    et = end_time.to_i * 1000
     print "Transferring #{name} (#{schedule_id})\n"
-    response = RestClient.get base_url + "metric/data/#{schedule_id}/raw.json?start=#{start_time}&end=#{end_time}"
+    url = base_url + "metric/data/#{schedule_id}/raw.json?startTime=#{st}&endTime=#{et}"
+    response = RestClient.get url
 
     JSON.parse(response)
   end
+
+  ##
+  # Return the schedule information for the passed +schedule_id+
 
   def self.get_schedule_for_id(base_url, schedule_id)
     response = RestClient.get base_url + "metric/schedule/#{schedule_id}.json"
 
     JSON.parse(response)
   end
+
+  ##
+  # Return all the links of the resource. This includes the (paging) links in the
+  # header of the +response+ as well as the link elements inside the +resource+ itself.
 
   def self.get_links(response,resource)
 
