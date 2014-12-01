@@ -12,7 +12,7 @@ load 'RHQ_util.rb'
 config = RHQ_config.new('rhqadmin', 'rhqadmin')
 
 # Name of resource field + display name that should be shown
-RESOURCE_FIELDS_TO_PRINT = {:resourceName => 'name',
+RESOURCE_FIELDS_TO_PRINT = {'resourceName' => 'name',
                             'resourceId' => 'id',
                             'typeName' => 'typ',
                             'availability' => 'availability'}
