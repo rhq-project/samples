@@ -52,6 +52,10 @@ class RHQ_util
 
   end
 
+  ##
+  # Return a hash containing all the links of the passed rest +resource+
+  # In the returned hash, the rel is the key and the url the value of this key.
+
   def self.get_resource_links(resource)
     raise 'Only a single resource is supported' if resource.kind_of?(Array)
 
@@ -68,6 +72,11 @@ class RHQ_util
     links
   end
 
+  ##
+  # Return a link for a +resource+ with a specified +rel_name+.
+  # This only groks resource links, but not paging links inside the
+  # header
+
   def self.get_link(resource,rel_name)
 
     links = get_resource_links(resource)
@@ -77,21 +86,31 @@ class RHQ_util
   end
 
 
-  def self.get_header_links(raw_headers)
+  ##
+  # Return a hash with < rel, href > from the raw header like e.g. 'Link:'
+  # See also https://github.com/rest-client/rest-client/issues/336 for the
+  # raison d'tre of this method.
+
+  def self.get_header_links(raw_header)
 
     # entries look like "<http://localhost:7080/rest/resource/platforms.json?page=-1>; rel=\"last\""
 
-    return {} if raw_headers.nil?
+    return {} if raw_header.nil?
 
     ret = {}
 
-    raw_headers.each do |x|
+    raw_header.each do |x|
       ret.merge!(split_link_header(x))
     end
 
     ret
 
   end
+
+  ##
+  # Split a link header in +val+ in the form of
+  # <http://localhost:7080/rest/resource/platforms.json?page=-1>; rel=\"last\"
+  # into a single element hash with the rel as key and the url as value
 
   def self.split_link_header(val)
     ret = {}
