@@ -1,0 +1,11 @@
+[Unit]
+Description=RHQ Server
+After=rhq-storage.service
+
+[Service]
+ExecStart={path-to-rhq-server-installation}/rhqctl console --server
+Restart=always
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
