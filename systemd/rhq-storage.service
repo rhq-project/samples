@@ -2,7 +2,7 @@
 Description=RHQ Storage Node
 
 [Service]
-ExecStart={path-to-rhq-server-installation}/rhqctl console --storage
+ExecStart=/path/to/rhq-server/installation/rhqctl console --storage
 Restart=always
 SuccessExitStatus=143
 

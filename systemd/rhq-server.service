@@ -3,7 +3,7 @@ Description=RHQ Server
 After=rhq-storage.service
 
 [Service]
-ExecStart={path-to-rhq-server-installation}/rhqctl console --server
+ExecStart=/path/to/rhq-server/installation/rhqctl console --server
 Restart=always
 SuccessExitStatus=143
 
