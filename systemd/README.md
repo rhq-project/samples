@@ -5,6 +5,7 @@ RHQ's runtime lifecycle can be successfully managed with systemd from version 4.
 1. Edit the .service files and replace the path with the correct ones (ExecStart property)
 2. Copy the files to ```/etc/systemd/system/```
 3. Run ```systemctl daemon-reload```
+4. Run ```systemctl enable rhq-storage.service; systemctl enable rhq-server.service```
 
 To control the running system, use the following commands (with sudo):
 
